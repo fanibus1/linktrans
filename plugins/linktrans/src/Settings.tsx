@@ -11,6 +11,19 @@ const RNKeyboard = findByProps("dismiss", "addListener");
 const Alert = findByProps("alert");
 const BackHandler = findByProps("addEventListener", "exitApp");
 
+const router = findByProps("goBack", "pop");
+const modalManager = findByProps("popModal", "pushModal");
+
+function exitSettings() {
+  if (router?.goBack) {
+    router.goBack();
+  } else if (router?.pop) {
+    router.pop();
+  } else if (modalManager?.popModal) {
+    modalManager.popModal();
+  }
+}
+
 export default function Settings() {
   const [rules, setRules] = React.useState<Rule[]>(() =>
     JSON.parse(JSON.stringify(storage.rules ?? []))
@@ -74,8 +87,7 @@ export default function Settings() {
               style: "destructive",
               onPress: () => {
                 hasChangesRef.current = false;
-                Navigation?.pop?.();
-                Navigation?.pop?.();
+                exitSettings();
               },
             },
             { text: "Cancel", style: "cancel" },
@@ -83,8 +95,7 @@ export default function Settings() {
               text: "Save",
               onPress: () => {
                 handleSave();
-                Navigation?.pop?.();
-                Navigation?.pop?.();
+                exitSettings();
               },
             },
           ]
@@ -118,7 +129,8 @@ export default function Settings() {
   };
 
   const confirmDeleteRule = (index: number) => {
-    const target = rules[index]?.sourceDomain || `Rule #${index + 1}`;
+    const ruleDomain = rules[index]?.sourceDomain;
+    const ruleNum = `Rule #${index + 1}`;
 
     const executeDelete = () => {
       setRules(rules.filter((_, i) => i !== index));
@@ -128,7 +140,7 @@ export default function Settings() {
     if (Alert?.alert) {
       Alert.alert(
         "Delete Rule",
-        `Are you sure you want to delete "${target}"?`,
+        `Are you sure you want to delete ${ruleNum} for "${ruleDomain}"?`,
         [
           { text: "Cancel", style: "cancel" },
           { text: "Delete", style: "destructive", onPress: executeDelete },
