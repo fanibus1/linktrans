@@ -1,0 +1,11 @@
+{
+    "name": "LinkTrans",
+    "description": "MAKE LINKS TRANS transgender link from the botw the link TRANSGENDER LINK (transforms links from e.g. x.com -> hotyurisex.com)",
+    "authors": [
+        {
+            "name": "hi",
+            "id": "scientistsrevealthe"
+        }
+    ],
+    "main": "src/index.ts"
+}
