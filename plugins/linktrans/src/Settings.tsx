@@ -1,4 +1,4 @@
-import { React } from "@vendetta/metro/common";
+import { React, Navigation } from "@vendetta/metro/common";
 import { findByProps } from "@vendetta/metro";
 import { Forms, General } from "@vendetta/ui/components";
 import { storage } from "@vendetta/plugin";
@@ -75,7 +75,7 @@ export default function Settings() {
               style: "destructive",
               onPress: () => {
                 hasChangesRef.current = false;
-                BackHandler.exitApp?.();
+                Navigation?.pop?.();
               },
             },
             { text: "Cancel", style: "cancel" },
@@ -83,6 +83,7 @@ export default function Settings() {
               text: "Save",
               onPress: () => {
                 handleSave();
+                Navigation?.pop?.();
               },
             },
           ]
@@ -106,7 +107,7 @@ export default function Settings() {
   const addRule = () => {
     setRules([
       ...rules,
-      { sourceDomain: "", targetDomains: [], keepParams: ["img_index"] },
+      { sourceDomain: "", targetDomains: [], keepParams: [] },
     ]);
     setHasChanges(true);
 
@@ -203,7 +204,9 @@ export default function Settings() {
               sectionPositions.current[idx] = e.nativeEvent.layout.y;
             }}
           >
-            <FormSection title={`Rule #${idx + 1}`}>
+            <FormSection 
+              title={`Rule #${idx + 1}${rule.sourceDomain?.trim() ? `: ${rule.sourceDomain.trim()}` : ""}`}
+            >
               <View
                 onLayout={(e: any) => {
                   fieldRelativePositions.current[`${idx}_source`] =
