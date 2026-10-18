@@ -5,16 +5,22 @@ import { storage } from "@vendetta/plugin";
 import { Rule } from "./types";
 
 const { FormSection, FormInput } = Forms;
-const { ScrollView, Button, View } = General;
+const { ScrollView, Button, View, Text } = General;
 
-// React Native modules resolved via Metro
 const RNKeyboard = findByProps("dismiss", "addListener");
 const Alert = findByProps("alert");
 
 export default function Settings() {
-  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  // Local state copy of rules for Save/Cancel transactions
+  const [rules, setRules] = React.useState<Rule[]>(() =>
+    JSON.parse(JSON.stringify(storage.rules ?? []))
+  );
+  const [hasChanges, setHasChanges] = React.useState(false);
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+
   const scrollRef = React.useRef<any>(null);
+  // Store measured vertical offsets for each input
+  const inputPositions = React.useRef<{ [key: string]: number }>({});
 
   React.useEffect(() => {
     if (!RNKeyboard?.addListener) return;
@@ -33,79 +39,119 @@ export default function Settings() {
     };
   }, []);
 
-  const rules: Rule[] = storage.rules ?? [];
-
   const updateRule = (index: number, key: keyof Rule, value: any) => {
-    rules[index][key] = value;
-    storage.rules = rules;
-    forceUpdate();
+    const updated = [...rules];
+    updated[index] = { ...updated[index], [key]: value };
+    setRules(updated);
+    setHasChanges(true);
   };
 
   const addRule = () => {
-    storage.rules = [
+    setRules([
       ...rules,
       { sourceDomain: "", targetDomains: [], keepParams: ["img_index"] },
-    ];
-    forceUpdate();
+    ]);
+    setHasChanges(true);
 
-    // Scroll down to newly created rule
     setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    }, 150);
   };
 
   const confirmDeleteRule = (index: number) => {
     const target = rules[index]?.sourceDomain || `Rule #${index + 1}`;
 
+    const executeDelete = () => {
+      setRules(rules.filter((_, i) => i !== index));
+      setHasChanges(true);
+    };
+
     if (Alert?.alert) {
       Alert.alert(
         "Delete Rule",
-        `Are you sure you want to delete the rule for "${target}"?`,
+        `Are you sure you want to delete "${target}"?`,
         [
           { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () => {
-              storage.rules = rules.filter((_, i) => i !== index);
-              forceUpdate();
-            },
-          },
+          { text: "Delete", style: "destructive", onPress: executeDelete },
         ]
       );
     } else {
-      // Fallback if native Alert module isn't reachable
-      storage.rules = rules.filter((_, i) => i !== index);
-      forceUpdate();
+      executeDelete();
     }
   };
 
-  // Measures the layout of the focused input's wrapper and scrolls it into view
-  const handleFocus = (event: any) => {
-    event?.target?.measureLayout?.(
-      scrollRef.current?.getInnerViewNode?.() ?? scrollRef.current,
-      (_left: number, top: number) => {
-        // Offset slightly (80px) so the field header and label are visible
-        const targetY = Math.max(0, top - 80);
-        scrollRef.current?.scrollTo({ y: targetY, animated: true });
-      },
-      () => {}
-    );
+  const handleSave = () => {
+    storage.rules = JSON.parse(JSON.stringify(rules));
+    setHasChanges(false);
+    RNKeyboard?.dismiss?.();
+    if (Alert?.alert) {
+      Alert.alert("Success", "Settings saved successfully.");
+    }
+  };
+
+  const handleCancel = () => {
+    setRules(JSON.parse(JSON.stringify(storage.rules ?? [])));
+    setHasChanges(false);
+    RNKeyboard?.dismiss?.();
+  };
+
+  // Registers the absolute Y offset relative to the ScrollView content canvas
+  const saveLayout = (key: string, e: any) => {
+    inputPositions.current[key] = e.nativeEvent.layout.y;
+  };
+
+  // Immediate scroll to recorded position on focus
+  const scrollToField = (key: string) => {
+    const y = inputPositions.current[key];
+    if (typeof y === "number") {
+      // Offset by 60px so label and surrounding block are visible
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: true });
+    }
   };
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Save / Cancel Bar */}
+      {hasChanges && (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: 12,
+            backgroundColor: "#202225",
+            borderBottomWidth: 1,
+            borderBottomColor: "#4f545c",
+          }}
+        >
+          <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
+            Unsaved Changes
+          </Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Button title="Cancel" color="#747f8d" onPress={handleCancel} />
+            <Button title="Save" color="#5865F2" onPress={handleSave} />
+          </View>
+        </View>
+      )}
+
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1, padding: 12 }}
         contentContainerStyle={{
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 120 : 40,
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 140 : 40,
         }}
         keyboardShouldPersistTaps="handled"
       >
         {rules.map((rule, idx) => (
-          <FormSection key={idx} title={`Rule #${idx + 1}`}>
-            <View onFocus={handleFocus}>
+          <FormSection
+            key={idx}
+            title={`Rule #${idx + 1}`}
+            onLayout={(e: any) => saveLayout(`section_${idx}`, e)}
+          >
+            <View
+              onLayout={(e: any) => saveLayout(`rule_${idx}_source`, e)}
+              onFocus={() => scrollToField(`rule_${idx}_source`)}
+            >
               <FormInput
                 title="Source Domain"
                 placeholder="instagram.com or x.com"
@@ -114,7 +160,10 @@ export default function Settings() {
               />
             </View>
 
-            <View onFocus={handleFocus}>
+            <View
+              onLayout={(e: any) => saveLayout(`rule_${idx}_target`, e)}
+              onFocus={() => scrollToField(`rule_${idx}_target`)}
+            >
               <FormInput
                 title="Target Domains (comma-separated)"
                 placeholder="website1.com, website2.com"
@@ -129,7 +178,10 @@ export default function Settings() {
               />
             </View>
 
-            <View onFocus={handleFocus}>
+            <View
+              onLayout={(e: any) => saveLayout(`rule_${idx}_params`, e)}
+              onFocus={() => scrollToField(`rule_${idx}_params`)}
+            >
               <FormInput
                 title="Keep Parameters (comma-separated)"
                 placeholder="img_index"
