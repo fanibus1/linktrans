@@ -1,4 +1,4 @@
-import { React, Navigation } from "@vendetta/metro/common";
+import { React } from "@vendetta/metro/common";
 import { findByProps } from "@vendetta/metro";
 import { Forms, General } from "@vendetta/ui/components";
 import { storage } from "@vendetta/plugin";
@@ -11,20 +11,11 @@ const RNKeyboard = findByProps("dismiss", "addListener");
 const Alert = findByProps("alert");
 const BackHandler = findByProps("addEventListener", "exitApp");
 
-const router = findByProps("goBack", "pop");
-const modalManager = findByProps("popModal", "pushModal");
-
-function exitSettings() {
-  if (router?.goBack) {
-    router.goBack();
-  } else if (router?.pop) {
-    router.pop();
-  } else if (modalManager?.popModal) {
-    modalManager.popModal();
-  }
-}
+const { useNavigation } = findByProps("useNavigation") ?? {};
 
 export default function Settings() {
+  const navigation = useNavigation?.();
+
   const [rules, setRules] = React.useState<Rule[]>(() =>
     JSON.parse(JSON.stringify(storage.rules ?? []))
   );
@@ -72,6 +63,16 @@ export default function Settings() {
     RNKeyboard?.dismiss?.();
   };
 
+  const exitSettings = () => {
+    hasChangesRef.current = false;
+
+    if (navigation?.canGoBack?.() && navigation?.goBack) {
+        navigation.goBack();
+    } else if (navigation?.pop) {
+        navigation.pop();
+    }
+  }
+
   // Intercept back navigation when unsaved changes exist
   React.useEffect(() => {
     if (!BackHandler?.addEventListener) return;
@@ -86,7 +87,6 @@ export default function Settings() {
               text: "Discard",
               style: "destructive",
               onPress: () => {
-                hasChangesRef.current = false;
                 exitSettings();
               },
             },
