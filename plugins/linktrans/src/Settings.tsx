@@ -3,7 +3,7 @@ import { Forms, General } from "@vendetta/ui/components";
 import { storage } from "@vendetta/plugin";
 import { Rule } from "./types";
 
-const { FormSection, FormInput, FormRow } = Forms;
+const { FormSection, FormInput } = Forms;
 const { ScrollView, Button, View } = General;
 
 export default function Settings() {
@@ -64,16 +64,22 @@ export default function Settings() {
               )
             }
           />
-          <Button
-            text="Delete Rule"
-            color="red"
-            onPress={() => deleteRule(idx)}
-            style={{ marginVertical: 8 }}
-          />
+          <View style={{ marginVertical: 8 }}>
+            <Button
+              title="Delete Rule"
+              color="#ED4245"
+              onPress={() => deleteRule(idx)}
+            />
+          </View>
         </FormSection>
       ))}
 
-      <Button text="Add New Rule" onPress={addRule} style={{ marginTop: 16 }} />
+      <View style={{ marginTop: 16, marginBottom: 32 }}>
+        <Button 
+          title="Add New Rule" 
+          onPress={addRule} 
+        />
+      </View>
     </ScrollView>
   );
 }
