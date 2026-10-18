@@ -51,7 +51,6 @@ export default function Settings() {
     storage.rules = JSON.parse(JSON.stringify(rulesRef.current));
     setHasChanges(false);
     RNKeyboard?.dismiss?.();
-    Alert?.alert?.("Success", "Settings saved successfully.");
   };
 
   const handleCancel = () => {
@@ -76,6 +75,7 @@ export default function Settings() {
               onPress: () => {
                 hasChangesRef.current = false;
                 Navigation?.pop?.();
+                Navigation?.pop?.();
               },
             },
             { text: "Cancel", style: "cancel" },
@@ -83,6 +83,7 @@ export default function Settings() {
               text: "Save",
               onPress: () => {
                 handleSave();
+                Navigation?.pop?.();
                 Navigation?.pop?.();
               },
             },
@@ -216,7 +217,7 @@ export default function Settings() {
               >
                 <FormInput
                   title="Source Domain"
-                  placeholder="instagram.com or x.com"
+                  placeholder="instagram.com"
                   value={rule.sourceDomain}
                   onChange={(val: string) => updateRule(idx, "sourceDomain", val)}
                 />
