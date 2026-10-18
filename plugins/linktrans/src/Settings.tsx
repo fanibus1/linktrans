@@ -1,4 +1,5 @@
 import { React } from "@vendetta/metro/common";
+import { findByProps } from "@vendetta/metro";
 import { Forms, General } from "@vendetta/ui/components";
 import { storage } from "@vendetta/plugin";
 import { Rule } from "./types";
@@ -6,11 +7,29 @@ import { Rule } from "./types";
 const { FormSection, FormInput } = Forms;
 const { ScrollView, Button, View } = General;
 
-// Fallback to General.KeyboardAvoidingView or standard View if not present
-const KeyboardAvoidingView = General.KeyboardAvoidingView ?? View;
+// Resolve React Native's core Keyboard module
+const RNKeyboard = findByProps("dismiss", "addListener");
 
 export default function Settings() {
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!RNKeyboard?.addListener) return;
+
+    const showSub = RNKeyboard.addListener("keyboardDidShow", (e: any) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 300);
+    });
+
+    const hideSub = RNKeyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub?.remove?.();
+      hideSub?.remove?.();
+    };
+  }, []);
 
   const rules: Rule[] = storage.rules ?? [];
 
@@ -34,15 +53,13 @@ export default function Settings() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior="padding" 
-      style={{ flex: 1 }}
-    >
-      <ScrollView 
+    <View style={{ flex: 1 }}>
+      <ScrollView
         style={{ flex: 1, padding: 12 }}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 40,
+        }}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
       >
         {rules.map((rule, idx) => (
           <FormSection key={idx} title={`Rule #${idx + 1}`}>
@@ -87,12 +104,9 @@ export default function Settings() {
         ))}
 
         <View style={{ marginTop: 16, marginBottom: 32 }}>
-          <Button 
-            title="Add New Rule" 
-            onPress={addRule} 
-          />
+          <Button title="Add New Rule" onPress={addRule} />
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
