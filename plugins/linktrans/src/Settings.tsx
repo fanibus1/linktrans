@@ -7,12 +7,14 @@ import { Rule } from "./types";
 const { FormSection, FormInput } = Forms;
 const { ScrollView, Button, View } = General;
 
-// Resolve React Native's core Keyboard module
+// React Native modules resolved via Metro
 const RNKeyboard = findByProps("dismiss", "addListener");
+const Alert = findByProps("alert");
 
 export default function Settings() {
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+  const scrollRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     if (!RNKeyboard?.addListener) return;
@@ -45,59 +47,108 @@ export default function Settings() {
       { sourceDomain: "", targetDomains: [], keepParams: ["img_index"] },
     ];
     forceUpdate();
+
+    // Scroll down to newly created rule
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
-  const deleteRule = (index: number) => {
-    storage.rules = rules.filter((_, i) => i !== index);
-    forceUpdate();
+  const confirmDeleteRule = (index: number) => {
+    const target = rules[index]?.sourceDomain || `Rule #${index + 1}`;
+
+    if (Alert?.alert) {
+      Alert.alert(
+        "Delete Rule",
+        `Are you sure you want to delete the rule for "${target}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              storage.rules = rules.filter((_, i) => i !== index);
+              forceUpdate();
+            },
+          },
+        ]
+      );
+    } else {
+      // Fallback if native Alert module isn't reachable
+      storage.rules = rules.filter((_, i) => i !== index);
+      forceUpdate();
+    }
+  };
+
+  // Measures the layout of the focused input's wrapper and scrolls it into view
+  const handleFocus = (event: any) => {
+    event?.target?.measureLayout?.(
+      scrollRef.current?.getInnerViewNode?.() ?? scrollRef.current,
+      (_left: number, top: number) => {
+        // Offset slightly (80px) so the field header and label are visible
+        const targetY = Math.max(0, top - 80);
+        scrollRef.current?.scrollTo({ y: targetY, animated: true });
+      },
+      () => {}
+    );
   };
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1, padding: 12 }}
         contentContainerStyle={{
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 40,
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 120 : 40,
         }}
         keyboardShouldPersistTaps="handled"
       >
         {rules.map((rule, idx) => (
           <FormSection key={idx} title={`Rule #${idx + 1}`}>
-            <FormInput
-              title="Source Domain"
-              placeholder="instagram.com or x.com"
-              value={rule.sourceDomain}
-              onChange={(val: string) => updateRule(idx, "sourceDomain", val)}
-            />
-            <FormInput
-              title="Target Domains (comma-separated)"
-              placeholder="website1.com, website2.com"
-              value={rule.targetDomains.join(", ")}
-              onChange={(val: string) =>
-                updateRule(
-                  idx,
-                  "targetDomains",
-                  val.split(",").map((s) => s.trim()).filter(Boolean)
-                )
-              }
-            />
-            <FormInput
-              title="Keep Parameters (comma-separated)"
-              placeholder="img_index"
-              value={rule.keepParams.join(", ")}
-              onChange={(val: string) =>
-                updateRule(
-                  idx,
-                  "keepParams",
-                  val.split(",").map((s) => s.trim()).filter(Boolean)
-                )
-              }
-            />
+            <View onFocus={handleFocus}>
+              <FormInput
+                title="Source Domain"
+                placeholder="instagram.com or x.com"
+                value={rule.sourceDomain}
+                onChange={(val: string) => updateRule(idx, "sourceDomain", val)}
+              />
+            </View>
+
+            <View onFocus={handleFocus}>
+              <FormInput
+                title="Target Domains (comma-separated)"
+                placeholder="website1.com, website2.com"
+                value={rule.targetDomains.join(", ")}
+                onChange={(val: string) =>
+                  updateRule(
+                    idx,
+                    "targetDomains",
+                    val.split(",").map((s) => s.trim()).filter(Boolean)
+                  )
+                }
+              />
+            </View>
+
+            <View onFocus={handleFocus}>
+              <FormInput
+                title="Keep Parameters (comma-separated)"
+                placeholder="img_index"
+                value={rule.keepParams.join(", ")}
+                onChange={(val: string) =>
+                  updateRule(
+                    idx,
+                    "keepParams",
+                    val.split(",").map((s) => s.trim()).filter(Boolean)
+                  )
+                }
+              />
+            </View>
+
             <View style={{ marginVertical: 8 }}>
               <Button
                 title="Delete Rule"
                 color="#ED4245"
-                onPress={() => deleteRule(idx)}
+                onPress={() => confirmDeleteRule(idx)}
               />
             </View>
           </FormSection>
