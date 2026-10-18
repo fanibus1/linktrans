@@ -9,9 +9,9 @@ const { ScrollView, Button, View, Text } = General;
 
 const RNKeyboard = findByProps("dismiss", "addListener");
 const Alert = findByProps("alert");
+const BackHandler = findByProps("addEventListener", "exitApp");
 
 export default function Settings() {
-  // Local state copy of rules for Save/Cancel transactions
   const [rules, setRules] = React.useState<Rule[]>(() =>
     JSON.parse(JSON.stringify(storage.rules ?? []))
   );
@@ -19,9 +19,17 @@ export default function Settings() {
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
 
   const scrollRef = React.useRef<any>(null);
-  // Store measured vertical offsets for each input
-  const inputPositions = React.useRef<{ [key: string]: number }>({});
 
+  // References to keep layout positions and clean state access
+  const sectionPositions = React.useRef<{ [key: number]: number }>({});
+  const fieldRelativePositions = React.useRef<{ [key: string]: number }>({});
+  const hasChangesRef = React.useRef(false);
+  const rulesRef = React.useRef(rules);
+
+  hasChangesRef.current = hasChanges;
+  rulesRef.current = rules;
+
+  // Track keyboard dimensions
   React.useEffect(() => {
     if (!RNKeyboard?.addListener) return;
 
@@ -37,6 +45,55 @@ export default function Settings() {
       showSub?.remove?.();
       hideSub?.remove?.();
     };
+  }, []);
+
+  const handleSave = () => {
+    storage.rules = JSON.parse(JSON.stringify(rulesRef.current));
+    setHasChanges(false);
+    RNKeyboard?.dismiss?.();
+    Alert?.alert?.("Success", "Settings saved successfully.");
+  };
+
+  const handleCancel = () => {
+    setRules(JSON.parse(JSON.stringify(storage.rules ?? [])));
+    setHasChanges(false);
+    RNKeyboard?.dismiss?.();
+  };
+
+  // Intercept back navigation when unsaved changes exist
+  React.useEffect(() => {
+    if (!BackHandler?.addEventListener) return;
+
+    const onBackPress = () => {
+      if (hasChangesRef.current) {
+        Alert?.alert?.(
+          "Unsaved Changes",
+          "You have unsaved changes. Do you want to save before leaving?",
+          [
+            {
+              text: "Discard",
+              style: "destructive",
+              onPress: () => {
+                hasChangesRef.current = false;
+                BackHandler.exitApp?.();
+              },
+            },
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Save",
+              onPress: () => {
+                handleSave();
+              },
+            },
+          ]
+        );
+        return true; // Stop default back navigation
+      }
+      return false;
+    };
+
+    const backSub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => backSub?.remove?.();
   }, []);
 
   const updateRule = (index: number, key: keyof Rule, value: any) => {
@@ -80,55 +137,52 @@ export default function Settings() {
     }
   };
 
-  const handleSave = () => {
-    storage.rules = JSON.parse(JSON.stringify(rules));
-    setHasChanges(false);
-    RNKeyboard?.dismiss?.();
-    if (Alert?.alert) {
-      Alert.alert("Success", "Settings saved successfully.");
-    }
-  };
+  // Cumulative scroll offset: section Y + input Y within section
+  const scrollToField = (sectionIdx: number, fieldKey: string) => {
+    const secY = sectionPositions.current[sectionIdx] ?? 0;
+    const fieldY = fieldRelativePositions.current[`${sectionIdx}_${fieldKey}`] ?? 0;
+    const absoluteTargetY = secY + fieldY;
 
-  const handleCancel = () => {
-    setRules(JSON.parse(JSON.stringify(storage.rules ?? [])));
-    setHasChanges(false);
-    RNKeyboard?.dismiss?.();
-  };
+    // Margin ensures the field header is comfortably visible above keyboard
+    const targetY = Math.max(0, absoluteTargetY - 40);
 
-  // Registers the absolute Y offset relative to the ScrollView content canvas
-  const saveLayout = (key: string, e: any) => {
-    inputPositions.current[key] = e.nativeEvent.layout.y;
-  };
-
-  // Immediate scroll to recorded position on focus
-  const scrollToField = (key: string) => {
-    const y = inputPositions.current[key];
-    if (typeof y === "number") {
-      // Offset by 60px so label and surrounding block are visible
-      scrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: true });
-    }
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: targetY, animated: true });
+    }, 100);
   };
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Save / Cancel Bar */}
+      {/* Top Bar: Cancel (Left) - Unsaved Changes (Center) - Save (Right) */}
       {hasChanges && (
         <View
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
             backgroundColor: "#202225",
             borderBottomWidth: 1,
             borderBottomColor: "#4f545c",
           }}
         >
-          <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
+          <View style={{ width: 80, alignItems: "flex-start" }}>
+            <Button title="Cancel" color="#747f8d" onPress={handleCancel} />
+          </View>
+
+          <Text
+            style={{
+              color: "#ffffff",
+              fontWeight: "bold",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
             Unsaved Changes
           </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button title="Cancel" color="#747f8d" onPress={handleCancel} />
+
+          <View style={{ width: 80, alignItems: "flex-end" }}>
             <Button title="Save" color="#5865F2" onPress={handleSave} />
           </View>
         </View>
@@ -138,72 +192,84 @@ export default function Settings() {
         ref={scrollRef}
         style={{ flex: 1, padding: 12 }}
         contentContainerStyle={{
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 140 : 40,
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 200 : 60,
         }}
         keyboardShouldPersistTaps="handled"
       >
         {rules.map((rule, idx) => (
-          <FormSection
+          <View
             key={idx}
-            title={`Rule #${idx + 1}`}
-            onLayout={(e: any) => saveLayout(`section_${idx}`, e)}
+            onLayout={(e: any) => {
+              sectionPositions.current[idx] = e.nativeEvent.layout.y;
+            }}
           >
-            <View
-              onLayout={(e: any) => saveLayout(`rule_${idx}_source`, e)}
-              onFocus={() => scrollToField(`rule_${idx}_source`)}
-            >
-              <FormInput
-                title="Source Domain"
-                placeholder="instagram.com or x.com"
-                value={rule.sourceDomain}
-                onChange={(val: string) => updateRule(idx, "sourceDomain", val)}
-              />
-            </View>
+            <FormSection title={`Rule #${idx + 1}`}>
+              <View
+                onLayout={(e: any) => {
+                  fieldRelativePositions.current[`${idx}_source`] =
+                    e.nativeEvent.layout.y;
+                }}
+                onFocus={() => scrollToField(idx, "source")}
+              >
+                <FormInput
+                  title="Source Domain"
+                  placeholder="instagram.com or x.com"
+                  value={rule.sourceDomain}
+                  onChange={(val: string) => updateRule(idx, "sourceDomain", val)}
+                />
+              </View>
 
-            <View
-              onLayout={(e: any) => saveLayout(`rule_${idx}_target`, e)}
-              onFocus={() => scrollToField(`rule_${idx}_target`)}
-            >
-              <FormInput
-                title="Target Domains (comma-separated)"
-                placeholder="website1.com, website2.com"
-                value={rule.targetDomains.join(", ")}
-                onChange={(val: string) =>
-                  updateRule(
-                    idx,
-                    "targetDomains",
-                    val.split(",").map((s) => s.trim()).filter(Boolean)
-                  )
-                }
-              />
-            </View>
+              <View
+                onLayout={(e: any) => {
+                  fieldRelativePositions.current[`${idx}_target`] =
+                    e.nativeEvent.layout.y;
+                }}
+                onFocus={() => scrollToField(idx, "target")}
+              >
+                <FormInput
+                  title="Target Domains (comma-separated)"
+                  placeholder="website1.com, website2.com"
+                  value={rule.targetDomains.join(", ")}
+                  onChange={(val: string) =>
+                    updateRule(
+                      idx,
+                      "targetDomains",
+                      val.split(",").map((s) => s.trim()).filter(Boolean)
+                    )
+                  }
+                />
+              </View>
 
-            <View
-              onLayout={(e: any) => saveLayout(`rule_${idx}_params`, e)}
-              onFocus={() => scrollToField(`rule_${idx}_params`)}
-            >
-              <FormInput
-                title="Keep Parameters (comma-separated)"
-                placeholder="img_index"
-                value={rule.keepParams.join(", ")}
-                onChange={(val: string) =>
-                  updateRule(
-                    idx,
-                    "keepParams",
-                    val.split(",").map((s) => s.trim()).filter(Boolean)
-                  )
-                }
-              />
-            </View>
+              <View
+                onLayout={(e: any) => {
+                  fieldRelativePositions.current[`${idx}_params`] =
+                    e.nativeEvent.layout.y;
+                }}
+                onFocus={() => scrollToField(idx, "params")}
+              >
+                <FormInput
+                  title="Keep Parameters (comma-separated)"
+                  placeholder="img_index"
+                  value={rule.keepParams.join(", ")}
+                  onChange={(val: string) =>
+                    updateRule(
+                      idx,
+                      "keepParams",
+                      val.split(",").map((s) => s.trim()).filter(Boolean)
+                    )
+                  }
+                />
+              </View>
 
-            <View style={{ marginVertical: 8 }}>
-              <Button
-                title="Delete Rule"
-                color="#ED4245"
-                onPress={() => confirmDeleteRule(idx)}
-              />
-            </View>
-          </FormSection>
+              <View style={{ marginVertical: 8 }}>
+                <Button
+                  title="Delete Rule"
+                  color="#ED4245"
+                  onPress={() => confirmDeleteRule(idx)}
+                />
+              </View>
+            </FormSection>
+          </View>
         ))}
 
         <View style={{ marginTop: 16, marginBottom: 32 }}>
