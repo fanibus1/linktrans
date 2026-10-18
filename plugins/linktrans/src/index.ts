@@ -20,14 +20,12 @@ const DEFAULT_RULES: Rule[] = [
   {
     sourceDomain: 'x.com',
     targetDomains: [
-      'girlcockx.com',
       'peepeepoopoodumdumtwitterx.org',
       'skibidix.com',
       'yiffx.com',
       'boycuntx.com',
       'yaoisex.com',
       'skibidix.com',
-      'gockx.com',
       'boypussyx.com',
       'catgirlsex.com',
     ],
