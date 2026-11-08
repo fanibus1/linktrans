@@ -250,7 +250,7 @@ export default function Settings() {
 							>
 								<FormInput
 									title="Source Domain"
-									placeholder="instagram.com"
+									placeholder="e.g. 'instagram.com'"
 									value={rule.sourceDomain}
 									multiline={true}
 									onChange={(val: string) =>
@@ -269,7 +269,7 @@ export default function Settings() {
 							>
 								<FormInput
 									title="Target Domains (csv)"
-									placeholder="website1.com, website2.com"
+									placeholder="e.g. 'website1.com, website2.com'"
 									value={rule.targetDomains.join(', ')}
 									multiline={true}
 									onChange={(val: string) =>
@@ -295,7 +295,7 @@ export default function Settings() {
 							>
 								<FormInput
 									title="Keep Parameters (csv)"
-									placeholder="img_index"
+									placeholder="e.g. 'img_index'"
 									value={rule.keepParams.join(', ')}
 									multiline={true}
 									onChange={(val: string) =>
