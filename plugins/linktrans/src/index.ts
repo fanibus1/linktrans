@@ -30,8 +30,20 @@ const DEFAULT_RULES: Rule[] = [
 			'catgirlsex.com',
 		],
 		keepParams: [],
+		appendPath: 'en',
 	},
 ];
+
+function appendPath(urlObj: URL, ...segments: string[]) {
+	const current = urlObj.pathname.replace(/\/+$/, '');
+	const additional = segments
+		.map((s) => s.replace(/^\/+|\/+$/g, ''))
+		.filter(Boolean)
+		.join('/');
+
+	urlObj.pathname = `${current}/${additional}`;
+	return urlObj;
+}
 
 function transformUrl(rawUrl: string, rules: Rule[]): string {
 	try {
@@ -50,7 +62,7 @@ function transformUrl(rawUrl: string, rules: Rule[]): string {
 
 		if (!rule || rule.targetDomains.length === 0) return rawUrl;
 
-		// 1. Pick a random target domain
+		// Pick a random target domain
 		const chosenTarget =
 			rule.targetDomains[
 				Math.floor(Math.random() * rule.targetDomains.length)
@@ -68,7 +80,7 @@ function transformUrl(rawUrl: string, rules: Rule[]): string {
 			url.hostname = chosenTarget.replace(/^www\./i, '');
 		}
 
-		// 2. Strip parameters except the whitelisted ones
+		// Strip parameters except whitelisted ones
 		const allowed = new Set(rule.keepParams.map((p) => p.trim()));
 		const paramsToDelete: string[] = [];
 
@@ -81,6 +93,9 @@ function transformUrl(rawUrl: string, rules: Rule[]): string {
 		for (const key of paramsToDelete) {
 			url.searchParams.delete(key);
 		}
+
+		// Append extra path if in rule
+		if (rule.appendPath) appendPath(url, rule.appendPath);
 
 		return url.toString();
 	} catch {
@@ -95,7 +110,7 @@ function processMessageContent(content: string, rules: Rule[]): string {
 	// i.e. matches links starting with https?:// NOT followed by another https?://,
 	// BUT having https?:// in the middle of the link is fine IFF it is a query parameter,
 	// e.g. https://gifconvert.vxtwitter.com/convert.avif?url=https://video.twimg.com/tweet_video/HUN83g9WwAAvw8z.mp4
-	const urlRegex = /https?:\/\/([^\s](?!(?<![^=]=)https?:\/\/))+[^\s]/gi;
+	const urlRegex = /https?:\/\/(?:[^\s](?!(?<![^=]=)https?:\/\/))+[^\s]/gi;
 
 	return content.replace(urlRegex, (match, offset) => {
 		const transformed = transformUrl(match, rules);

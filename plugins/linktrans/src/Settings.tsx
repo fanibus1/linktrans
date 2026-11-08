@@ -100,7 +100,9 @@ export default function Settings() {
 						},
 					],
 				);
-				return true; // Stop default back navigation
+
+				// Stop default back navigation
+				return true;
 			}
 			return false;
 		};
@@ -250,6 +252,7 @@ export default function Settings() {
 									title="Source Domain"
 									placeholder="instagram.com"
 									value={rule.sourceDomain}
+									multiline={true}
 									onChange={(val: string) =>
 										updateRule(idx, 'sourceDomain', val)
 									}
@@ -265,9 +268,10 @@ export default function Settings() {
 								onFocus={() => scrollToField(idx, 'target')}
 							>
 								<FormInput
-									title="Target Domains (comma-separated)"
+									title="Target Domains (csv)"
 									placeholder="website1.com, website2.com"
 									value={rule.targetDomains.join(', ')}
+									multiline={true}
 									onChange={(val: string) =>
 										updateRule(
 											idx,
@@ -290,9 +294,10 @@ export default function Settings() {
 								onFocus={() => scrollToField(idx, 'params')}
 							>
 								<FormInput
-									title="Keep Parameters (comma-separated)"
+									title="Keep Parameters (csv)"
 									placeholder="img_index"
 									value={rule.keepParams.join(', ')}
+									multiline={true}
 									onChange={(val: string) =>
 										updateRule(
 											idx,
@@ -302,6 +307,25 @@ export default function Settings() {
 												.map((s) => s.trim())
 												.filter(Boolean),
 										)
+									}
+								/>
+							</View>
+
+							<View
+								onLayout={(e: any) => {
+									fieldRelativePositions.current[
+										`${idx}_append`
+									] = e.nativeEvent.layout.y;
+								}}
+								onFocus={() => scrollToField(idx, 'append')}
+							>
+								<FormInput
+									title="Append to Path"
+									placeholder="e.g. 'en'"
+									value={rule.appendPath}
+									multiline={true}
+									onChange={(val: string) =>
+										updateRule(idx, 'appendPath', val)
 									}
 								/>
 							</View>
